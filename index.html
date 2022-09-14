@@ -19,6 +19,14 @@
             body {
                 margin: 0;
                 font-family: BlinkMacSystemFont,-apple-system,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+                -webkit-user-select: none;
+                -ms-user-select: none;
+                -moz-user-select: none;
+                user-select: none;
+            }
+
+            audio {
+                display: none !important;
             }
 
             #pageContent {
@@ -33,6 +41,7 @@
                 width: var(--cube-size);
                 height: var(--cube-size);
                 perspective: calc(var(--cube-size) * 3);
+                cursor: pointer;
             }
 
             .cube {
@@ -54,7 +63,6 @@
                 font-size: xx-large;
                 border: calc(var(--cube-size) * 1/100) solid black;
                 background-color: #fff;
-                user-select: none;
                 border-radius: calc(var(--cube-size) * 5/100);
                 flex-direction: column;
                 box-shadow: inset 0 0 calc(var(--cube-size) * 5/100) #000000;
@@ -171,6 +179,10 @@
             #pageFooter p {
                 margin: 0;
             }
+
+            .scene.is-cube-spinning {
+                cursor: not-allowed;
+            }
         </style>
     </head>
     <body>
@@ -240,6 +252,10 @@
             </div><!-- scene -->
 
             <p class="" id="resultDiceNo">Click on the Dice to Rotate</p>
+
+            <audio id="riceRollingEffect" loop>
+                <source src="assets/audio/rolling-dice.mp3" type="audio/mp3">
+            </audio>
         </div><!-- pageContent -->
 
         <footer id="pageFooter">
@@ -256,12 +272,13 @@
 
                 document.querySelectorAll('.cube').forEach(function(element) {
                     element.addEventListener('click', function() {
-                        rollCube(this);
+                        rollDice(this);
                     });
                 });
 
-                function rollCube(cube) {
+                function rollDice(cube) {
                     if(!cube.classList.contains('cube-rotating')) {
+                        cube.closest('.scene').classList.add('is-cube-spinning');
                         cube.classList.add('cube-rotating');
 
                         document.getElementById('resultDiceNo').innerHTML = 'Rotating...';
@@ -273,17 +290,24 @@
 
                             let randomNo = Math.floor((Math.random() * 6)) + 1;
                             let cubeFacePos = Object.keys(cubeRotateClassList).indexOf(String(randomNo));
+                            let sameAsPrev = (typeof(window.prevCubeFacePos) != 'undefined' ? (window.prevCubeFacePos == cubeFacePos) : false);
+
+                            document.getElementById('riceRollingEffect').pause();
+                            document.getElementById('riceRollingEffect').currentTime = 0;
 
                             if(cubeFacePos > -1) {
                                 currPos = cubeFacePos;
                                 rotateCube(cube, true);
 
-                                document.getElementById('resultDiceNo').innerHTML = `You got: <b>${randomNo}</b>`;
+                                document.getElementById('resultDiceNo').innerHTML = (sameAsPrev ? 'Wow! ' : '') + `You got: <b>${randomNo}</b>` + (sameAsPrev ? ' again.' : '');
                             } else {
                                 document.getElementById('resultDiceNo').innerHTML = 'Click on the Dice to Rotate';
                             }
 
+                            window.prevCubeFacePos = cubeFacePos;
+
                             cube.classList.remove('cube-rotating');
+                            cube.closest('.scene').classList.remove('is-cube-spinning');
                         }, 2000);
                     }
                 }
@@ -305,6 +329,8 @@
                     currPos++;
 
                     if(!oneTime) {
+                        document.getElementById('riceRollingEffect').play();
+
                         cubeRotationTimeout = setTimeout(function() {
                             rotateCube(cube);
                         }, 150);
