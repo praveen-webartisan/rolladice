@@ -33,8 +33,9 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                min-height: calc(100vh - var(--page-footer) - (var(--page-footer-padding) * 2));
                 flex-direction: column;
+                min-height: calc(100vh - var(--page-footer) - (var(--page-footer-padding) * 2));
+                position: relative;
             }
 
             .scene {
@@ -174,6 +175,7 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
+                text-align: center;
             }
 
             #pageFooter p {
@@ -183,11 +185,73 @@
             .scene.is-cube-spinning {
                 cursor: not-allowed;
             }
+
+            .text-center {
+                text-align: center;
+            }
+
+            .radio-control, input[type="radio"] {
+                cursor: pointer;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: auto auto;
+                row-gap: 1em;
+                column-gap: 1em;
+            }
+
+            .grid-col-2 {
+                grid-column: 1/3;
+            }
+
+            #pageContent .action-btns {
+                position: absolute;
+                padding: 0.5rem 1rem;
+            }
+
+            #pageContent .action-btns.bordered {
+                border: 0.1rem solid #000;
+                border-radius: 0.5rem;
+            }
+
+            #pageContent .action-btns.at-top {
+                top: 1em;
+            }
+
+            #pageContent .action-btns.at-bottom {
+                bottom: 1em;
+            }
         </style>
     </head>
     <body>
         <div id="pageContent">
+            <div class="grid" id="diceTray"></div>
+
+            <div class="action-btns at-top" style="margin-top: 2rem;">
+                <b>Click on the Dice to roll</b>
+            </div>
+
+            <div class="grid action-btns bordered at-bottom">
+                <div class="grid-col-2 text-center">
+                    <label><b>No of Dice</b></label>
+                </div>
+                <div>
+                    <label class="radio-control">
+                        <input type="radio" name="noOfDice" value="1"> One
+                    </label>
+                </div>
+                <div>
+                    <label class="radio-control">
+                        <input type="radio" name="noOfDice" value="2"> Two
+                    </label>
+                </div>
+            </div>
+        </div><!-- pageContent -->
+
+        <template id="tmplScene">
             <div class="scene">
+
                 <div class="cube">
                     <div class="cube-face cube-face-front">
                         <span class="cube-dots">
@@ -249,14 +313,14 @@
                         </span>
                     </div>
                 </div>
+
+                <!-- <p class="" id="resultDiceNo">Click on the Dice to Rotate</p> -->
+
+                <audio class="riceRollingEffect" loop>
+                    <source src="assets/audio/rolling-dice.mp3" type="audio/mp3">
+                </audio>
             </div><!-- scene -->
-
-            <p class="" id="resultDiceNo">Click on the Dice to Rotate</p>
-
-            <audio id="riceRollingEffect" loop>
-                <source src="assets/audio/rolling-dice.mp3" type="audio/mp3">
-            </audio>
-        </div><!-- pageContent -->
+        </template>
 
         <footer id="pageFooter">
             <p>
@@ -266,45 +330,99 @@
 
         <script type="text/javascript">
             (function() {
-                var cubeRotateClassList = {5: 'show-right', 6: 'show-back', 4: 'show-top', 3: 'show-left', 1: 'show-front', 2: 'show-bottom'};
-                var currPos = 0;
-                var cubeRotationTimeout;
+                let cubeRotateClassList = {5: 'show-right', 6: 'show-back', 4: 'show-top', 3: 'show-left', 1: 'show-front', 2: 'show-bottom'},
+                    cubeProps = {},
+                    diceIndex = 0,
+                    noOfDice = 1;
 
-                document.querySelectorAll('.cube').forEach(function(element) {
-                    element.addEventListener('click', function() {
-                        rollDice(this);
+                window.onload = function() {
+                    noOfDice = localStorage.getItem('noOfDice');
+
+                    if (!noOfDice) {
+                        noOfDice = 1;
+                    }
+
+                    let selectedRadioBtn = document.querySelector(`[name="noOfDice"][value="${noOfDice}"]`);
+                    selectedRadioBtn.click();
+
+                    for (let i = 0; i < noOfDice; i++) {
+                        addADiceScene();
+                    }
+
+                    document.querySelectorAll('[name="noOfDice"]').forEach(function(element) {
+                        element.addEventListener('click', function() {
+                            for (let tempCubeProp in cubeProps) {
+                                if (tempCubeProp.cubeRotationTimeout) {
+                                    clearTimeout(tempCubeProp.cubeRotationTimeout);
+                                }
+                            }
+
+                            while(document.getElementById('diceTray').firstChild) {
+                                document.getElementById('diceTray').firstChild.remove();
+                            }
+
+                            cubeProps = {};
+
+                            noOfDice = this.value;
+
+                            if (!noOfDice) {
+                                noOfDice = 1;
+                            }
+
+                            localStorage.setItem('noOfDice', noOfDice);
+
+                            for (let i = 0; i < noOfDice; i++) {
+                                addADiceScene();
+                            }
+                        });
                     });
-                });
+                };
+
+                function addADiceScene() {
+                    let template = document.getElementById('tmplScene').content.firstElementChild.cloneNode(true);
+                    template.setAttribute('id', `diceScene-${diceIndex}`);
+                    template.querySelector('.cube').setAttribute('id', `dice-${diceIndex}`);
+
+                    document.getElementById('diceTray').appendChild(template);
+
+                    document.getElementById(`diceScene-${diceIndex}`).querySelector('.cube').addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        document.getElementById('diceTray').querySelectorAll('.cube').forEach(function(cube) {
+                            rollDice(cube);
+                        });
+                    });
+
+                    diceIndex++;
+                }
 
                 function rollDice(cube) {
                     if(!cube.classList.contains('cube-rotating')) {
+                        if (!cubeProps[cube.getAttribute('id')]) {
+                            cubeProps[cube.getAttribute('id')] = {
+                                'currPos': 0,
+                                'cubeRotationTimeout': null,
+                            };
+                        }
+
                         cube.closest('.scene').classList.add('is-cube-spinning');
                         cube.classList.add('cube-rotating');
 
-                        document.getElementById('resultDiceNo').innerHTML = 'Rotating...';
-
                         rotateCube(cube);
 
-                        setTimeout(function() {
-                            clearTimeout(cubeRotationTimeout);
+                        cubeProps[cube.getAttribute('id')].cubeStopTimeout = setTimeout(function() {
+                            clearTimeout(cubeProps[cube.getAttribute('id')].cubeRotationTimeout);
 
                             let randomNo = Math.floor((Math.random() * 6)) + 1;
                             let cubeFacePos = Object.keys(cubeRotateClassList).indexOf(String(randomNo));
-                            let sameAsPrev = (typeof(window.prevCubeFacePos) != 'undefined' ? (window.prevCubeFacePos == cubeFacePos) : false);
-
-                            document.getElementById('riceRollingEffect').pause();
-                            document.getElementById('riceRollingEffect').currentTime = 0;
+                            cube.closest('.scene').querySelector('.riceRollingEffect').pause();
+                            cube.closest('.scene').querySelector('.riceRollingEffect').currentTime = 0;
 
                             if(cubeFacePos > -1) {
-                                currPos = cubeFacePos;
+                                cubeProps[cube.getAttribute('id')].currPos = cubeFacePos;
                                 rotateCube(cube, true);
-
-                                document.getElementById('resultDiceNo').innerHTML = (sameAsPrev ? 'Wow! ' : '') + `You got: <b>${randomNo}</b>` + (sameAsPrev ? ' again.' : '');
-                            } else {
-                                document.getElementById('resultDiceNo').innerHTML = 'Click on the Dice to Rotate';
                             }
-
-                            window.prevCubeFacePos = cubeFacePos;
 
                             cube.classList.remove('cube-rotating');
                             cube.closest('.scene').classList.remove('is-cube-spinning');
@@ -315,23 +433,23 @@
                 function rotateCube(cube, oneTime = false) {
                     let classesList = Object.values(cubeRotateClassList);
 
-                    if(currPos >= classesList.length) {
-                        currPos = 0;
+                    if(cubeProps[cube.getAttribute('id')].currPos >= classesList.length) {
+                        cubeProps[cube.getAttribute('id')].currPos = 0;
                     }
 
                     let classToRemove = classesList.slice();
-                    classToRemove.splice(currPos, 1);
+                    classToRemove.splice(cubeProps[cube.getAttribute('id')].currPos, 1);
 
                     cube.classList.remove(...classToRemove);
 
-                    cube.classList.add(classesList[currPos]);
+                    cube.classList.add(classesList[cubeProps[cube.getAttribute('id')].currPos]);
 
-                    currPos++;
+                    cubeProps[cube.getAttribute('id')].currPos++;
 
                     if(!oneTime) {
-                        document.getElementById('riceRollingEffect').play();
+                        cube.closest('.scene').querySelector('.riceRollingEffect').play();
 
-                        cubeRotationTimeout = setTimeout(function() {
+                        cubeProps[cube.getAttribute('id')].cubeRotationTimeout = setTimeout(function() {
                             rotateCube(cube);
                         }, 150);
                     }
